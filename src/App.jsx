@@ -29,6 +29,7 @@ import {
 import {
   initializeMusicKit,
   isUserAuthorized,
+  isMusicKitConfigured,
   loginWithAppleMusic
 } from './services/appleMusic';
 
@@ -70,13 +71,37 @@ export default function App() {
   // Modals & Apple Music Status
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAppleMusicAuthorized, setIsAppleMusicAuthorized] = useState(false);
+  const [isMusicKitLoading, setIsMusicKitLoading] = useState(true);
   const [liveTrackInfo, setLiveTrackInfo] = useState(null);
 
-  // Initialize Apple MusicKit on mount
+  // Initialize Apple MusicKit on mount (now fetches developer token from server)
   useEffect(() => {
-    initializeMusicKit().then(() => {
-      setIsAppleMusicAuthorized(isUserAuthorized());
-    });
+    let cancelled = false;
+
+    async function setupMusicKit() {
+      setIsMusicKitLoading(true);
+      try {
+        // Wait briefly for MusicKit SDK script to load
+        let retries = 0;
+        while (!window.MusicKit && retries < 20) {
+          await new Promise((r) => setTimeout(r, 250));
+          retries++;
+        }
+        await initializeMusicKit();
+        if (!cancelled) {
+          setIsAppleMusicAuthorized(isUserAuthorized());
+        }
+      } catch (err) {
+        console.warn('MusicKit setup error:', err);
+      } finally {
+        if (!cancelled) {
+          setIsMusicKitLoading(false);
+        }
+      }
+    }
+
+    setupMusicKit();
+    return () => { cancelled = true; };
   }, []);
 
   // Check daily completion on mount and mode switch
@@ -464,6 +489,7 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         isAppleMusicAuthorized={isAppleMusicAuthorized}
         onAuthStatusChange={(status) => setIsAppleMusicAuthorized(status)}
+        isMusicKitLoading={isMusicKitLoading}
       />
 
       {/* Game Complete Summary Modal */}
