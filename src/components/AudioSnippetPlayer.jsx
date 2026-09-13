@@ -9,6 +9,7 @@ export default function AudioSnippetPlayer({
   currentAttempt,
   maxAttempts,
   isRoundOver,
+  isGameFinished,
   onSnippetEnd
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -21,7 +22,7 @@ export default function AudioSnippetPlayer({
   const animationFrameRef = useRef(null);
   const maxPlayDuration = isRoundOver ? 30 : (SNIPPET_DURATIONS[currentAttempt] || 15);
 
-  // Stop playback when track or round changes
+  // Stop playback when track changes (new previewUrl)
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -30,6 +31,30 @@ export default function AudioSnippetPlayer({
     setIsPlaying(false);
     setCurrentTime(0);
   }, [previewUrl]);
+
+  // Auto-play full 30s preview when round ends (answer revealed)
+  useEffect(() => {
+    if (isRoundOver && audioRef.current && previewUrl) {
+      audioRef.current.currentTime = 0;
+      setCurrentTime(0);
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setIsPlaying(true))
+          .catch(() => setIsPlaying(false));
+      }
+    }
+  }, [isRoundOver]);
+
+  // Stop playback when game finishes (summary modal appears)
+  useEffect(() => {
+    if (isGameFinished && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlaying(false);
+      setCurrentTime(0);
+    }
+  }, [isGameFinished]);
 
   // Handle audio progress and hard-stop at maxPlayDuration
   const handleTimeUpdate = () => {

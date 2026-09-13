@@ -468,6 +468,7 @@ export default function App() {
               currentAttempt={currentAttempt}
               maxAttempts={MAX_ATTEMPTS}
               isRoundOver={isRoundOver}
+              isGameFinished={isGameFinished}
             />
 
             {/* Guess Input & Choices or Reveal Modal */}
