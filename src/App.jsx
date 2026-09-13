@@ -5,6 +5,7 @@ import ArtistGuessInput from './components/ArtistGuessInput';
 import RoundResultModal from './components/RoundResultModal';
 import SettingsModal from './components/SettingsModal';
 import GameSummaryModal from './components/GameSummaryModal';
+import AppleMusicGate from './components/AppleMusicGate';
 
 import {
   UK_TOP_10_TRACKS,
@@ -385,8 +386,27 @@ export default function App() {
     }
   };
 
+  // Gate login handler
+  const handleGateLogin = async () => {
+    const res = await loginWithAppleMusic();
+    if (res.isAuthorized) {
+      setIsAppleMusicAuthorized(true);
+    }
+  };
+
   const todayDateString = getTodayDateString();
   const dailyNumber = getDailyNumber(todayDateString);
+
+  // Show login gate if user is not authorized
+  if (!isAppleMusicAuthorized) {
+    return (
+      <AppleMusicGate
+        isMusicKitLoading={isMusicKitLoading}
+        isMusicKitConfigured={isMusicKitConfigured()}
+        onLogin={handleGateLogin}
+      />
+    );
+  }
 
   return (
     <div className="app-root">
