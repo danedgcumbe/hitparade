@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import { X, Key, Radio, Volume2, ShieldCheck, Check, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Radio, Info } from 'lucide-react';
 import {
-  getSavedDeveloperToken,
-  saveDeveloperToken,
   loginWithAppleMusic,
   logoutAppleMusic,
   isMusicKitConfigured
@@ -15,28 +13,12 @@ export default function SettingsModal({
   onAuthStatusChange,
   isMusicKitLoading
 }) {
-  const [saveSuccess, setSaveSuccess] = useState(false);
   const [authError, setAuthError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [tokenInput, setTokenInput] = useState(getSavedDeveloperToken());
 
   if (!isOpen) return null;
 
   const musicKitReady = isMusicKitConfigured();
-
-  const handleSaveToken = () => {
-    saveDeveloperToken(tokenInput);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
-  };
-
-  const handleClearToken = () => {
-    setTokenInput('');
-    saveDeveloperToken('');
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
-  };
 
   const handleAppleLogin = async () => {
     setAuthError('');
@@ -121,47 +103,6 @@ export default function SettingsModal({
             {authError && <div className="error-alert">{authError}</div>}
           </div>
 
-          {/* Advanced: Custom Developer Token (collapsed by default) */}
-          <div className="settings-section">
-            <button
-              className="advanced-toggle"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-            >
-              <Key size={16} />
-              <span>Advanced: Custom Developer Token</span>
-              {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
-
-            {showAdvanced && (
-              <div className="advanced-content">
-                <p className="section-desc">
-                  Override the automatic server token with your own Apple MusicKit developer JWT. Only use this if you know what you're doing.
-                </p>
-
-                <div className="token-input-group">
-                  <textarea
-                    className="token-textarea"
-                    rows={3}
-                    placeholder="eyJhbGciOiJFUzI1NiIsImtpZCI6..."
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value)}
-                  />
-                  <div className="token-actions">
-                    <button className="save-token-btn" onClick={handleSaveToken}>
-                      {saveSuccess ? <Check size={16} /> : null}
-                      <span>{saveSuccess ? 'Saved!' : 'Save Token'}</span>
-                    </button>
-                    {tokenInput && (
-                      <button className="clear-token-btn" onClick={handleClearToken}>
-                        <span>Clear Override</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Info Notice */}
           <div className="info-notice">
             <Info size={18} className="info-icon" />
@@ -180,3 +121,4 @@ export default function SettingsModal({
     </div>
   );
 }
+
