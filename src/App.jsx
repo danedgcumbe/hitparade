@@ -265,15 +265,71 @@ export default function App() {
     } else {
       // Incorrect Guess
       playWrongSound();
-      const nextAttempt = currentAttempt + 1;
-      const updatedGuesses = [
-        ...guessesHistory,
-        { text: guessedArtist, isCorrect: false }
-      ];
-      setGuessesHistory(updatedGuesses);
 
+      // In choice mode, any guess is FINAL — one shot only
+      if (gameMode === 'choice') {
+        setGuessesHistory((prev) => [
+          ...prev,
+          { text: guessedArtist, isCorrect: false }
+        ]);
+        setIsCorrect(false);
+        setEarnedPoints(0);
+        setStreak(0);
+        setIsRoundOver(true);
+
+        setGameHistory((prev) => [
+          ...prev,
+          {
+            track: currentTrack,
+            isCorrect: false,
+            earnedPoints: 0,
+            secondsUsed: SNIPPET_DURATIONS[currentAttempt] || 15
+          }
+        ]);
+      } else {
+        // Pro mode: multiple guess attempts allowed
+        const nextAttempt = currentAttempt + 1;
+        const updatedGuesses = [
+          ...guessesHistory,
+          { text: guessedArtist, isCorrect: false }
+        ];
+        setGuessesHistory(updatedGuesses);
+
+        if (nextAttempt >= MAX_ATTEMPTS) {
+          // Out of attempts! Round failed
+          setIsCorrect(false);
+          setEarnedPoints(0);
+          setStreak(0);
+          setIsRoundOver(true);
+
+          setGameHistory((prev) => [
+            ...prev,
+            {
+              track: currentTrack,
+              isCorrect: false,
+              earnedPoints: 0,
+              secondsUsed: 15
+            }
+          ]);
+        } else {
+          // Unlock next segment duration
+          setCurrentAttempt(nextAttempt);
+          playUnlockSound();
+        }
+      }
+    }
+  };
+
+  // Handle Skip / Unlock more audio
+  const handleSkip = () => {
+    if (isRoundOver) return;
+
+    const nextAttempt = currentAttempt + 1;
+
+    if (gameMode === 'choice') {
+      // Choice mode: skip just unlocks more audio, no guess history entry
       if (nextAttempt >= MAX_ATTEMPTS) {
-        // Out of attempts! Round failed
+        // All snippets heard without guessing — round lost
         setIsCorrect(false);
         setEarnedPoints(0);
         setStreak(0);
@@ -289,42 +345,35 @@ export default function App() {
           }
         ]);
       } else {
-        // Unlock next segment duration
         setCurrentAttempt(nextAttempt);
-        playUnlockSound();
       }
-    }
-  };
-
-  // Handle Skip / Unlock more audio
-  const handleSkip = () => {
-    if (isRoundOver) return;
-
-    const nextAttempt = currentAttempt + 1;
-    const updatedGuesses = [
-      ...guessesHistory,
-      { text: 'Skipped (+seconds)', isCorrect: false, isSkipped: true }
-    ];
-    setGuessesHistory(updatedGuesses);
-
-    if (nextAttempt >= MAX_ATTEMPTS) {
-      // Reveal answer
-      setIsCorrect(false);
-      setEarnedPoints(0);
-      setStreak(0);
-      setIsRoundOver(true);
-
-      setGameHistory((prev) => [
-        ...prev,
-        {
-          track: currentTrack,
-          isCorrect: false,
-          earnedPoints: 0,
-          secondsUsed: 15
-        }
-      ]);
     } else {
-      setCurrentAttempt(nextAttempt);
+      // Pro mode: skip counts as a used attempt
+      const updatedGuesses = [
+        ...guessesHistory,
+        { text: 'Skipped (+seconds)', isCorrect: false, isSkipped: true }
+      ];
+      setGuessesHistory(updatedGuesses);
+
+      if (nextAttempt >= MAX_ATTEMPTS) {
+        // Reveal answer
+        setIsCorrect(false);
+        setEarnedPoints(0);
+        setStreak(0);
+        setIsRoundOver(true);
+
+        setGameHistory((prev) => [
+          ...prev,
+          {
+            track: currentTrack,
+            isCorrect: false,
+            earnedPoints: 0,
+            secondsUsed: 15
+          }
+        ]);
+      } else {
+        setCurrentAttempt(nextAttempt);
+      }
     }
   };
 
@@ -480,6 +529,7 @@ export default function App() {
                 onSkip={handleSkip}
                 guessesHistory={guessesHistory}
                 maxAttempts={MAX_ATTEMPTS}
+                currentAttempt={currentAttempt}
                 isRoundOver={isRoundOver}
                 hints={currentTrack.hints}
                 year={currentTrack.year}

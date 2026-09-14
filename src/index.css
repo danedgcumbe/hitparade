@@ -597,6 +597,46 @@ body {
   color: #ff726d;
 }
 
+.guess-pill.skipped {
+  background: rgba(100, 210, 255, 0.1);
+  border-color: rgba(100, 210, 255, 0.35);
+  color: rgba(100, 210, 255, 0.7);
+}
+
+.guess-pill.skipped svg {
+  opacity: 0.6;
+}
+
+/* Points at Stake Badge */
+.points-at-stake {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 0.35rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  border-radius: 20px;
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.points-at-stake .stake-icon {
+  color: var(--apple-pink);
+}
+
+.points-at-stake strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.points-at-stake .stake-next {
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-size: 0.72rem;
+}
+
 /* Clues / Hints */
 .hints-container {
   display: flex;
@@ -802,6 +842,18 @@ body {
 .skip-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
+}
+
+.skip-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+}
+
+.skip-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
 }
 
 /* Round Result Modal / Card */
@@ -1452,6 +1504,11 @@ body {
 @keyframes scaleUp {
   from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Responsive */

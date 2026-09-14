@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, FastForward, Lightbulb, Check, X, HelpCircle } from 'lucide-react';
+import { Search, FastForward, Lightbulb, Check, X, HelpCircle, Headphones, Crosshair, Music } from 'lucide-react';
 import { ALL_UK_ARTISTS } from '../services/ukChartsCatalog';
 import { playUnlockSound } from '../services/soundEffects';
+
+const POINTS_LADDER = [1000, 750, 500, 350, 200];
 
 export default function ArtistGuessInput({
   mode, // 'pro' (typeahead) | 'choice' (multiple-choice)
@@ -10,6 +12,7 @@ export default function ArtistGuessInput({
   onSkip,
   guessesHistory,
   maxAttempts,
+  currentAttempt,
   isRoundOver,
   hints,
   year,
@@ -103,9 +106,62 @@ export default function ArtistGuessInput({
     setShowHint(!showHint);
   };
 
-  return (
-    <div className="guess-section">
-      {/* Past Guesses Badges */}
+  const isChoiceMode = mode === 'choice';
+
+  // In choice mode: pills represent snippet stages (listen → listen → ... → guess)
+  // In pro mode: pills represent guess attempts (try 1 → try 2 → ...)
+  const renderProgressPills = () => {
+    if (isChoiceMode) {
+      // Show snippet duration stages — each skip = "listened"
+      const SNIPPET_LABELS = ['1.5s', '3s', '6s', '10s', '15s'];
+      return (
+        <div className="guesses-history">
+          {SNIPPET_LABELS.map((label, idx) => {
+            const isSkipped = idx < currentAttempt;
+            const isCurrent = idx === currentAttempt && !isRoundOver;
+            const isGuessed = guessesHistory.length > 0 && idx === currentAttempt;
+            const guess = isGuessed ? guessesHistory[guessesHistory.length - 1] : null;
+
+            let className = 'guess-pill';
+            if (guess && isGuessed) {
+              className += guess.isCorrect ? ' correct' : ' incorrect';
+            } else if (isSkipped) {
+              className += ' skipped';
+            } else if (isCurrent) {
+              className += ' active';
+            } else {
+              className += ' empty';
+            }
+
+            return (
+              <div key={idx} className={className}>
+                {guess && isGuessed ? (
+                  <>
+                    {guess.isCorrect ? <Check size={14} /> : <X size={14} />}
+                    <span className="guess-name">{guess.text}</span>
+                  </>
+                ) : isSkipped ? (
+                  <>
+                    <Headphones size={13} />
+                    <span className="attempt-num">{label}</span>
+                  </>
+                ) : isCurrent ? (
+                  <>
+                    <Crosshair size={13} />
+                    <span className="attempt-num">{label}</span>
+                  </>
+                ) : (
+                  <span className="attempt-num">{label}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // Pro mode: original guess attempt pills
+    return (
       <div className="guesses-history">
         {Array.from({ length: maxAttempts }).map((_, idx) => {
           const guess = guessesHistory[idx];
@@ -134,6 +190,27 @@ export default function ArtistGuessInput({
           );
         })}
       </div>
+    );
+  };
+
+  // Points at stake indicator for choice mode
+  const pointsAtStake = POINTS_LADDER[currentAttempt] || 150;
+
+  return (
+    <div className="guess-section">
+      {/* Progress Pills */}
+      {renderProgressPills()}
+
+      {/* Points at Stake badge (choice mode only) */}
+      {isChoiceMode && !isRoundOver && (
+        <div className="points-at-stake">
+          <Music size={14} className="stake-icon" />
+          <span>Lock in now for <strong>{pointsAtStake} pts</strong></span>
+          {currentAttempt < maxAttempts - 1 && (
+            <span className="stake-next"> · skip to hear more ({POINTS_LADDER[currentAttempt + 1]} pts)</span>
+          )}
+        </div>
+      )}
 
       {/* Clues / Hint Card */}
       <div className="hints-container">
@@ -223,20 +300,35 @@ export default function ArtistGuessInput({
         </div>
       )}
 
-      {/* Action Buttons (Skip / Give Up / Next Snippet) */}
+      {/* Action Buttons */}
       {!isRoundOver && (
         <div className="guess-actions">
-          <button
-            className="skip-btn"
-            onClick={handleSkipClick}
-          >
-            <FastForward size={16} />
-            <span>
-              {guessesHistory.length >= maxAttempts - 1
-                ? 'Give Up & Reveal'
-                : 'Unlock Longer Snippet (+seconds)'}
-            </span>
-          </button>
+          {isChoiceMode ? (
+            <button
+              className="skip-btn"
+              onClick={handleSkipClick}
+              disabled={currentAttempt >= maxAttempts - 1}
+            >
+              <FastForward size={16} />
+              <span>
+                {currentAttempt >= maxAttempts - 1
+                  ? 'Max Snippet — Pick Your Answer!'
+                  : 'Hear More Before Guessing'}
+              </span>
+            </button>
+          ) : (
+            <button
+              className="skip-btn"
+              onClick={handleSkipClick}
+            >
+              <FastForward size={16} />
+              <span>
+                {guessesHistory.length >= maxAttempts - 1
+                  ? 'Give Up & Reveal'
+                  : 'Unlock Longer Snippet (+seconds)'}
+              </span>
+            </button>
+          )}
         </div>
       )}
     </div>
