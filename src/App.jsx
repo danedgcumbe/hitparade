@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import Header from './components/Header';
 import AudioSnippetPlayer, { SNIPPET_DURATIONS } from './components/AudioSnippetPlayer';
 import ArtistGuessInput from './components/ArtistGuessInput';
@@ -577,6 +578,7 @@ export default function App() {
           onSwitchToFreeplay={() => handleSwitchMode('freeplay')}
         />
       )}
+      <Analytics />
     </div>
   );
 }
