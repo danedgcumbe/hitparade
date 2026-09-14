@@ -93,7 +93,7 @@ export async function initializeMusicKit(customToken = null) {
     await window.MusicKit.configure({
       developerToken: token,
       app: {
-        name: 'HitParade UK Top 10s',
+        name: 'PopsIQ UK Top 10s',
         build: '1.0.0'
       }
     });

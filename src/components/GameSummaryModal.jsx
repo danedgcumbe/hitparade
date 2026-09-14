@@ -54,11 +54,9 @@ export default function GameSummaryModal({
       .map((h) => (h.isCorrect ? (h.secondsUsed <= 3 ? '🟩' : '🟨') : '🟥'))
       .join('');
 
-    const prefix = challengeMode === 'daily'
-      ? `🇬🇧 HitParade Daily #${dailyNumber}`
-      : `🇬🇧 HitParade UK Top 10s`;
+    const prefix = `🎵 PopsIQ Daily #${dailyNumber}`
 
-    const text = `${prefix}\n${eraLabel}\nScore: ${score} pts | Accuracy: ${accuracy}%\n${emojis}\nGuess the artist from opening snippets on Apple Music!`;
+    const text = `${prefix}\n${eraLabel}\nScore: ${score} pts | Accuracy: ${accuracy}%\n${emojis}\nGuess the artist for UK Top 10 hits`;
 
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);

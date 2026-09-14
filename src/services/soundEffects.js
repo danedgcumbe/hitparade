@@ -1,4 +1,4 @@
-// Web Audio API Synthesized Sound Effects for HitParade
+// Web Audio API Synthesized Sound Effects for PopsIQ
 
 let audioCtx = null;
 

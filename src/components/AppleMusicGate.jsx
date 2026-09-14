@@ -35,7 +35,7 @@ export default function AppleMusicGate({
         </div>
 
         {/* Title */}
-        <h1 className="gate-title">HitParade</h1>
+        <h1 className="gate-title">PopsIQ</h1>
         <p className="gate-subtitle">UK Top 10s • Apple Music Guessing Game</p>
 
         {/* Description */}

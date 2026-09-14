@@ -27,8 +27,8 @@ export default function Header({
             <Music2 className="brand-icon" size={22} />
           </div>
           <div className="brand-text">
-            <span className="brand-title">HitParade</span>
-            <span className="brand-subtitle">UK Top 10s • Apple Music</span>
+            <span className="brand-title">PopsIQ</span>
+            <span className="brand-subtitle">UK Top 10 hits</span>
           </div>
         </div>
 
