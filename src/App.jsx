@@ -447,17 +447,6 @@ export default function App() {
   const todayDateString = getTodayDateString();
   const dailyNumber = getDailyNumber(todayDateString);
 
-  // Show login gate if user is not authorized
-  if (!isAppleMusicAuthorized) {
-    return (
-      <AppleMusicGate
-        isMusicKitLoading={isMusicKitLoading}
-        isMusicKitConfigured={isMusicKitConfigured()}
-        onLogin={handleGateLogin}
-      />
-    );
-  }
-
   return (
     <div className="app-root">
       {/* Dynamic Ambient Background Glow */}
@@ -578,6 +567,17 @@ export default function App() {
           onSwitchToFreeplay={() => handleSwitchMode('freeplay')}
         />
       )}
+
+      {/* Apple Music Auth Gate Overlay — shown on top of game UI */}
+      {!isAppleMusicAuthorized && (
+        <AppleMusicGate
+          isMusicKitLoading={isMusicKitLoading}
+          isMusicKitConfigured={isMusicKitConfigured()}
+          onLogin={handleGateLogin}
+          isFreeTrialExpired={false}
+        />
+      )}
+
       <Analytics />
     </div>
   );

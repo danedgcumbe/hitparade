@@ -1550,11 +1550,12 @@ body {
    ═══════════════════════════════════════════════════════════════ */
 
 .gate-container {
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
   overflow: hidden;
   padding: 2rem;
 }
