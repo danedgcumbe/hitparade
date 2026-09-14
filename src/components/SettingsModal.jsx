@@ -63,25 +63,24 @@ export default function SettingsModal({
               {musicKitReady
                 ? 'Apple Music is ready. Log in with your Apple ID to enjoy full catalog tracks and seamless integration.'
                 : isMusicKitLoading
-                ? 'Connecting to Apple Music services...'
-                : 'Apple Music connection is being set up. The game works instantly with built-in preview audio.'}
+                  ? 'Connecting to Apple Music services...'
+                  : 'Apple Music connection is being set up. The game works instantly with built-in preview audio.'}
             </p>
 
             <div className="auth-box">
               <div className="auth-status-indicator">
-                <span className={`status-dot ${
-                  isAppleMusicAuthorized ? 'online' :
-                  musicKitReady ? 'ready' :
-                  isMusicKitLoading ? 'loading' : 'preview'
-                }`}></span>
+                <span className={`status-dot ${isAppleMusicAuthorized ? 'online' :
+                    musicKitReady ? 'ready' :
+                      isMusicKitLoading ? 'loading' : 'preview'
+                  }`}></span>
                 <span className="status-label">
                   {isAppleMusicAuthorized
                     ? 'Apple Music Subscriber: Active'
                     : musicKitReady
-                    ? 'Ready — Log in to access full catalog'
-                    : isMusicKitLoading
-                    ? 'Connecting to Apple Music...'
-                    : 'Mode: High-Fidelity Apple Preview Streams'}
+                      ? 'Ready — Log in to access full catalog'
+                      : isMusicKitLoading
+                        ? 'Connecting to Apple Music...'
+                        : 'Mode: High-Fidelity Apple Preview Streams'}
                 </span>
               </div>
 
@@ -93,23 +92,16 @@ export default function SettingsModal({
                 {isLoggingIn
                   ? 'Connecting to Apple Music...'
                   : isAppleMusicAuthorized
-                  ? 'Disconnect Apple Music'
-                  : musicKitReady
-                  ? 'Log in with Apple Music'
-                  : 'Apple Music Not Available'}
+                    ? 'Disconnect Apple Music'
+                    : musicKitReady
+                      ? 'Log in with Apple Music'
+                      : 'Apple Music Not Available'}
               </button>
             </div>
 
             {authError && <div className="error-alert">{authError}</div>}
           </div>
 
-          {/* Info Notice */}
-          <div className="info-notice">
-            <Info size={18} className="info-icon" />
-            <div className="info-text">
-              <strong>Instant Play:</strong> HitParade includes built-in UK Top 10 Apple preview audio samples, so the game is 100% playable immediately — Apple Music login adds full catalog streaming!
-            </div>
-          </div>
         </div>
 
         <div className="modal-footer">
