@@ -8,13 +8,14 @@
 //   APPLE_TEAM_ID     — 10-char Apple Developer Team ID
 //   APPLE_KEY_ID      — 10-char MusicKit Key ID  
 //   APPLE_PRIVATE_KEY — Full .p8 private key contents (with newlines)
-//   APPLE_MUSIC_ORIGIN — (Optional) Comma-separated allowed origins
+//   APPLE_MUSIC_ORIGIN — (Optional) Comma-separated allowed origins or omit/set '*' for universal access
 
 import crypto from 'crypto';
 
 // In-memory cache to avoid regenerating on every request
 let cachedToken = null;
 let cachedTokenExpiry = 0;
+let cachedConfigKey = '';
 
 /**
  * Base64url encode a buffer (JWT-safe base64 without padding)
@@ -25,6 +26,66 @@ function base64urlEncode(buffer) {
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
+}
+
+/**
+ * Parse and normalize allowed origins for the Apple developer token JWT.
+ * Apple strictly compares the request's Origin header against the origin claim array.
+ * Trailing slashes (e.g. "https://domain.com/") cause 401 Unauthorized errors because
+ * browsers RFC 6454 Origin headers never include trailing slashes.
+ *
+ * If origins is omitted or set to wildcard/all/none, we return an empty array.
+ * When the origin claim is omitted from the JWT, Apple permits the token from all domains.
+ */
+function parseAndNormalizeOrigins(originsEnv) {
+  if (!originsEnv) return [];
+  const trimmed = originsEnv.trim();
+  if (
+    trimmed === '*' ||
+    trimmed.toLowerCase() === 'all' ||
+    trimmed.toLowerCase() === 'none' ||
+    trimmed.toLowerCase() === 'false'
+  ) {
+    return [];
+  }
+
+  const originsSet = new Set();
+  const list = trimmed.split(',').map((o) => o.trim()).filter(Boolean);
+
+  for (let origin of list) {
+    // Strip all trailing slashes
+    origin = origin.replace(/\/+$/, '');
+    if (!origin) continue;
+
+    // Ensure protocol
+    if (!origin.startsWith('http://') && !origin.startsWith('https://')) {
+      origin = `https://${origin}`;
+    }
+
+    originsSet.add(origin);
+
+    // Automatically expand apex <-> www variations
+    try {
+      const parsed = new URL(origin);
+      const host = parsed.hostname;
+      if (host.startsWith('www.')) {
+        const apex = `${parsed.protocol}//${host.slice(4)}${parsed.port ? ':' + parsed.port : ''}`;
+        originsSet.add(apex);
+      } else if (!host.includes('localhost') && !host.includes('127.0.0.1')) {
+        const www = `${parsed.protocol}//www.${host}${parsed.port ? ':' + parsed.port : ''}`;
+        originsSet.add(www);
+      }
+    } catch (e) {
+      // Ignore URL parse error
+    }
+  }
+
+  // Always include standard production origins when origin restriction is enabled
+  originsSet.add('https://popsiq.com');
+  originsSet.add('https://www.popsiq.com');
+  originsSet.add('https://hitparade.vercel.app');
+
+  return Array.from(originsSet);
 }
 
 /**
@@ -48,7 +109,7 @@ function generateDeveloperToken({ teamId, keyId, privateKey, origins }) {
     exp: exp,
   };
 
-  // Add origin claim if configured (recommended for web apps)
+  // Add origin claim only if configured (optional in Apple MusicKit spec)
   if (origins && origins.length > 0) {
     claims.origin = origins;
   }
@@ -86,7 +147,8 @@ export default function handler(req, res) {
   // CORS headers for frontend access
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
-  res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+  // Avoid CDN caching of stale JWT tokens
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
   // Read credentials from environment
   const teamId = process.env.APPLE_TEAM_ID;
@@ -107,15 +169,19 @@ export default function handler(req, res) {
   }
   privateKey = privateKey.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').trim();
 
-  // Parse optional origins
-  const originsEnv = process.env.APPLE_MUSIC_ORIGIN;
-  const origins = originsEnv
-    ? originsEnv.split(',').map((o) => o.trim()).filter(Boolean)
-    : [];
+  // Parse and normalize origins (strips trailing slashes, adds apex & www variants)
+  const origins = parseAndNormalizeOrigins(process.env.APPLE_MUSIC_ORIGIN);
 
-  // Return cached token if still valid (with 1 hour buffer)
+  // Cache key based on config so token regenerates immediately when env vars change
+  const currentConfigKey = `${teamId}:${keyId}:${origins.join(',')}`;
+
+  // Return cached token if still valid (with 1 hour buffer) and config hasn't changed
   const now = Math.floor(Date.now() / 1000);
-  if (cachedToken && cachedTokenExpiry > now + 3600) {
+  if (
+    cachedToken &&
+    cachedTokenExpiry > now + 3600 &&
+    cachedConfigKey === currentConfigKey
+  ) {
     return res.status(200).json({ token: cachedToken });
   }
 
@@ -130,6 +196,7 @@ export default function handler(req, res) {
     // Cache the generated token
     cachedToken = token;
     cachedTokenExpiry = expiresAt;
+    cachedConfigKey = currentConfigKey;
 
     return res.status(200).json({ token });
   } catch (err) {

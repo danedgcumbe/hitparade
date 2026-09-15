@@ -1,5 +1,5 @@
-// Apple MusicKit JS SDK Service & Fallback Audio Player Manager
-// Now with automatic server-side developer token fetching
+// Apple MusicKit JS SDK Service & Audio Manager
+// Automatic server-side developer token fetching and MusicKit lifecycle
 
 const DEV_TOKEN_STORAGE_KEY = 'hitparade_apple_dev_token';
 const TOKEN_API_ENDPOINT = '/api/apple-music-token';
@@ -12,18 +12,24 @@ let tokenFetchPromise = null;
  * Get stored Apple MusicKit Developer Token (manual override) if user provided one
  */
 export function getSavedDeveloperToken() {
-  return localStorage.getItem(DEV_TOKEN_STORAGE_KEY) || '';
+  try {
+    return localStorage.getItem(DEV_TOKEN_STORAGE_KEY) || '';
+  } catch (e) {
+    return '';
+  }
 }
 
 /**
  * Save custom Apple Developer Token (manual override for power users)
  */
 export function saveDeveloperToken(token) {
-  if (token) {
-    localStorage.setItem(DEV_TOKEN_STORAGE_KEY, token.trim());
-  } else {
-    localStorage.removeItem(DEV_TOKEN_STORAGE_KEY);
-  }
+  try {
+    if (token) {
+      localStorage.setItem(DEV_TOKEN_STORAGE_KEY, token.trim());
+    } else {
+      localStorage.removeItem(DEV_TOKEN_STORAGE_KEY);
+    }
+  } catch (e) {}
 }
 
 /**
@@ -32,11 +38,10 @@ export function saveDeveloperToken(token) {
  * Caches the fetch promise to avoid duplicate requests.
  */
 export async function fetchDeveloperToken() {
-  // If user has a manual override token, prefer that
-  const savedToken = getSavedDeveloperToken();
-  if (savedToken) {
-    return savedToken;
-  }
+  // Clear any legacy custom tokens from earlier development to avoid stale tokens
+  try {
+    localStorage.removeItem(DEV_TOKEN_STORAGE_KEY);
+  } catch (e) {}
 
   // Avoid duplicate fetches
   if (tokenFetchPromise) {
@@ -79,6 +84,10 @@ export async function fetchDeveloperToken() {
  * 2. Otherwise, fetch the developer token from our server API.
  * 3. Configure MusicKit with the token.
  *
+ * Note on storefront: We do not explicitly hardcode storefrontId here. Per Apple docs,
+ * MusicKit automatically resolves and adopts the authenticated user's storefront upon sign-in.
+ * Hardcoding it can cause CONTENT_EQUIVALENT mismatch errors for international subscribers.
+ *
  * Returns the MusicKit instance or null.
  */
 export async function initializeMusicKit(customToken = null) {
@@ -96,26 +105,14 @@ export async function initializeMusicKit(customToken = null) {
       return null;
     }
 
-    // Detect user country from browser locale (e.g. en-CA -> 'ca', en-GB -> 'gb')
-    let defaultStorefront = 'gb';
-    try {
-      const locale = (typeof navigator !== 'undefined' && (navigator.language || navigator.languages?.[0])) || '';
-      const parts = locale.split(/[-_]/);
-      if (parts.length > 1 && parts[1].length === 2) {
-        defaultStorefront = parts[1].toLowerCase();
-      }
-    } catch (e) {
-      defaultStorefront = 'gb';
-    }
-
     await window.MusicKit.configure({
       developerToken: token,
       app: {
         name: 'PopsIQ UK Top 10s',
         build: '1.0.0'
-      },
-      storefrontId: defaultStorefront
+      }
     });
+
     musicKitInstance = window.MusicKit.getInstance();
     isMusicKitReady = true;
     console.log('Apple MusicKit configured successfully');
