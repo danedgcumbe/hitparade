@@ -96,12 +96,25 @@ export async function initializeMusicKit(customToken = null) {
       return null;
     }
 
+    // Detect user country from browser locale (e.g. en-CA -> 'ca', en-GB -> 'gb')
+    let defaultStorefront = 'gb';
+    try {
+      const locale = (typeof navigator !== 'undefined' && (navigator.language || navigator.languages?.[0])) || '';
+      const parts = locale.split(/[-_]/);
+      if (parts.length > 1 && parts[1].length === 2) {
+        defaultStorefront = parts[1].toLowerCase();
+      }
+    } catch (e) {
+      defaultStorefront = 'gb';
+    }
+
     await window.MusicKit.configure({
       developerToken: token,
       app: {
         name: 'PopsIQ UK Top 10s',
         build: '1.0.0'
-      }
+      },
+      storefrontId: defaultStorefront
     });
     musicKitInstance = window.MusicKit.getInstance();
     isMusicKitReady = true;
