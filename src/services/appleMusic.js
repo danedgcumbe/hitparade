@@ -48,7 +48,13 @@ export async function fetchDeveloperToken() {
       const res = await fetch(TOKEN_API_ENDPOINT);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        console.warn('Failed to fetch developer token from server:', errorData);
+        console.warn('Failed to fetch developer token from server:', res.status, errorData);
+        return null;
+      }
+      // Guard against HTML responses (e.g. SPA catch-all rewrite serving index.html)
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        console.warn('Token endpoint returned non-JSON response (content-type:', contentType, '). Check vercel.json rewrites.');
         return null;
       }
       const data = await res.json();
@@ -138,11 +144,18 @@ export async function loginWithAppleMusic() {
     );
   }
 
-  const userToken = await musicKitInstance.authorize();
-  return {
-    isAuthorized: true,
-    userToken
-  };
+  try {
+    const userToken = await musicKitInstance.authorize();
+    return {
+      isAuthorized: musicKitInstance.isAuthorized,
+      userToken
+    };
+  } catch (err) {
+    console.warn('Apple Music authorize() failed:', err);
+    throw new Error(
+      'Apple Music sign-in was cancelled or failed. Please try again.'
+    );
+  }
 }
 
 /**
