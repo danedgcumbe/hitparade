@@ -151,9 +151,13 @@ export async function loginWithAppleMusic() {
       userToken
     };
   } catch (err) {
-    console.warn('Apple Music authorize() failed:', err);
+    console.error('Apple Music authorize() error details:', err);
+    const rawMsg = err?.message || err?.description || (typeof err === 'string' ? err : '');
+    if (rawMsg && !rawMsg.includes('cancelled') && !rawMsg.includes('canceled')) {
+      throw new Error(`Apple Music sign-in failed: ${rawMsg}`);
+    }
     throw new Error(
-      'Apple Music sign-in was cancelled or failed. Please try again.'
+      'Apple Music sign-in was cancelled or closed. Please try again.'
     );
   }
 }

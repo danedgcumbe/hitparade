@@ -32,18 +32,18 @@ function base64urlEncode(buffer) {
  */
 function generateDeveloperToken({ teamId, keyId, privateKey, origins }) {
   const now = Math.floor(Date.now() / 1000);
-  // Token valid for 180 days (Apple max is ~6 months / 15777000 seconds)
-  const exp = now + 15777000;
+  // Token valid for 180 days (15,552,000 seconds — safely under Apple's 15,777,000s hard limit to prevent clock skew rejection)
+  const exp = now + 15552000;
 
   // JWT Header
   const header = {
     alg: 'ES256',
-    kid: keyId,
+    kid: keyId.trim(),
   };
 
   // JWT Claims
   const claims = {
-    iss: teamId,
+    iss: teamId.trim(),
     iat: now,
     exp: exp,
   };
@@ -100,8 +100,12 @@ export default function handler(req, res) {
     });
   }
 
-  // Handle escaped newlines in env var (Vercel sometimes stores \n as literal backslash-n)
-  const privateKey = privateKeyEnv.replace(/\\n/g, '\n');
+  // Handle escaped newlines, quotes, or carriage returns in env var
+  let privateKey = privateKeyEnv.trim();
+  if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+    privateKey = privateKey.slice(1, -1);
+  }
+  privateKey = privateKey.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').trim();
 
   // Parse optional origins
   const originsEnv = process.env.APPLE_MUSIC_ORIGIN;
