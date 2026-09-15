@@ -35,7 +35,7 @@ export function saveDeveloperToken(token) {
 /**
  * Fetch the developer token from our server-side API endpoint.
  * Returns the JWT string, or null if unavailable.
- * Caches the fetch promise to avoid duplicate requests.
+ * Caches the fetch promise to avoid duplicate in-flight requests.
  */
 export async function fetchDeveloperToken() {
   // Clear any legacy custom tokens from earlier development to avoid stale tokens
@@ -50,7 +50,16 @@ export async function fetchDeveloperToken() {
 
   tokenFetchPromise = (async () => {
     try {
-      const res = await fetch(TOKEN_API_ENDPOINT);
+      // Use cache-busting timestamp and cache: 'no-store' to guarantee browser never uses stale disk cache
+      const timestamp = Date.now();
+      const res = await fetch(`${TOKEN_API_ENDPOINT}?_t=${timestamp}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         console.warn('Failed to fetch developer token from server:', res.status, errorData);
@@ -83,10 +92,6 @@ export async function fetchDeveloperToken() {
  * 1. If a custom token is provided, use it directly.
  * 2. Otherwise, fetch the developer token from our server API.
  * 3. Configure MusicKit with the token.
- *
- * Note on storefront: We do not explicitly hardcode storefrontId here. Per Apple docs,
- * MusicKit automatically resolves and adopts the authenticated user's storefront upon sign-in.
- * Hardcoding it can cause CONTENT_EQUIVALENT mismatch errors for international subscribers.
  *
  * Returns the MusicKit instance or null.
  */
@@ -154,6 +159,14 @@ export async function loginWithAppleMusic() {
     );
   }
 
+  // If already authorized, return immediately
+  if (musicKitInstance.isAuthorized) {
+    return {
+      isAuthorized: true,
+      userToken: musicKitInstance.musicUserToken
+    };
+  }
+
   try {
     const userToken = await musicKitInstance.authorize();
     return {
@@ -162,6 +175,14 @@ export async function loginWithAppleMusic() {
     };
   } catch (err) {
     console.error('Apple Music authorize() error details:', err);
+    // If instance is authorized despite error, consider it authorized
+    if (musicKitInstance.isAuthorized) {
+      return {
+        isAuthorized: true,
+        userToken: musicKitInstance.musicUserToken
+      };
+    }
+
     const rawMsg = err?.message || err?.description || (typeof err === 'string' ? err : '');
     if (rawMsg && !rawMsg.includes('cancelled') && !rawMsg.includes('canceled')) {
       throw new Error(`Apple Music sign-in failed: ${rawMsg}`);
