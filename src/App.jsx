@@ -14,6 +14,7 @@ import {
   ERAS,
   ERA_LABELS,
   fetchAppleMusicTrackMetadata,
+  getCachedTrackMetadata,
   preloadTracksMetadata
 } from './services/ukChartsCatalog';
 
@@ -167,17 +168,20 @@ export default function App() {
     setIsRoundOver(false);
     setIsCorrect(false);
     setEarnedPoints(0);
-    setLiveTrackInfo(null);
 
     const track = queue[rIndex];
     if (track) {
-      fetchAppleMusicTrackMetadata(track.appleMusicQuery || `${track.artist} ${track.title}`).then(
-        (meta) => {
-          if (meta) {
-            setLiveTrackInfo(meta);
-          }
+      // Synchronously hydrate from memory/localStorage cache if already preloaded
+      const cached = getCachedTrackMetadata(track);
+      setLiveTrackInfo(cached || null);
+
+      fetchAppleMusicTrackMetadata(track).then((meta) => {
+        if (meta) {
+          setLiveTrackInfo(meta);
         }
-      );
+      });
+    } else {
+      setLiveTrackInfo(null);
     }
   };
 

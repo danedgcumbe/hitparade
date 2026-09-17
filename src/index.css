@@ -1782,3 +1782,17 @@ body {
     height: 36px;
   }
 }
+
+/* Generic Spin Animation Utility */
+.animate-spin {
+  animation: spin-infinite 1s linear infinite;
+}
+
+@keyframes spin-infinite {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

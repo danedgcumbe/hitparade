@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, Loader2 } from 'lucide-react';
 import { playClickSound } from '../services/soundEffects';
 
 export const SNIPPET_DURATIONS = [1.5, 3.0, 6.0, 10.0, 15.0];
@@ -22,14 +22,18 @@ export default function AudioSnippetPlayer({
   const animationFrameRef = useRef(null);
   const maxPlayDuration = isRoundOver ? 30 : (SNIPPET_DURATIONS[currentAttempt] || 15);
 
-  // Stop playback when track changes (new previewUrl)
+  // Stop playback and reload media engine when previewUrl changes
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      if (previewUrl) {
+        audioRef.current.load();
+      }
     }
     setIsPlaying(false);
     setCurrentTime(0);
+    setIsLoading(false);
   }, [previewUrl]);
 
   // Auto-play full 30s preview when round ends (answer revealed)
@@ -44,7 +48,7 @@ export default function AudioSnippetPlayer({
           .catch(() => setIsPlaying(false));
       }
     }
-  }, [isRoundOver]);
+  }, [isRoundOver, previewUrl]);
 
   // Stop playback when game finishes (summary modal appears)
   useEffect(() => {
@@ -73,7 +77,7 @@ export default function AudioSnippetPlayer({
 
   const togglePlay = () => {
     playClickSound();
-    if (!audioRef.current) return;
+    if (!audioRef.current || !previewUrl) return;
 
     if (isPlaying) {
       audioRef.current.pause();
@@ -100,10 +104,22 @@ export default function AudioSnippetPlayer({
 
   const restartPlay = () => {
     playClickSound();
-    if (!audioRef.current) return;
+    if (!audioRef.current || !previewUrl) return;
     audioRef.current.currentTime = 0;
     setCurrentTime(0);
-    audioRef.current.play().then(() => setIsPlaying(true));
+    setIsLoading(true);
+    const playPromise = audioRef.current.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          setIsLoading(false);
+          setIsPlaying(true);
+        })
+        .catch((err) => {
+          console.warn('Restart play error:', err);
+          setIsLoading(false);
+        });
+    }
   };
 
   const toggleMute = () => {
@@ -185,6 +201,15 @@ export default function AudioSnippetPlayer({
         src={previewUrl}
         preload="auto"
         onTimeUpdate={handleTimeUpdate}
+        onWaiting={() => setIsLoading(true)}
+        onCanPlay={() => setIsLoading(false)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onError={(e) => {
+          console.warn('Audio playback error:', e);
+          setIsLoading(false);
+          setIsPlaying(false);
+        }}
         onEnded={() => {
           setIsPlaying(false);
           setCurrentTime(0);
@@ -232,18 +257,22 @@ export default function AudioSnippetPlayer({
           onClick={restartPlay}
           title="Replay from start"
           aria-label="Replay snippet"
+          disabled={!previewUrl}
         >
           <RotateCcw size={18} />
         </button>
 
         <button
-          className={`play-main-button ${isPlaying ? 'playing' : ''} ${isLoading ? 'loading' : ''}`}
+          className={`play-main-button ${isPlaying ? 'playing' : ''} ${isLoading || !previewUrl ? 'loading' : ''}`}
           onClick={togglePlay}
-          aria-label={isPlaying ? 'Pause' : 'Play Snippet'}
+          aria-label={!previewUrl ? 'Loading snippet' : isPlaying ? 'Pause' : 'Play Snippet'}
           disabled={!previewUrl}
+          title={!previewUrl ? 'Loading audio snippet...' : isPlaying ? 'Pause snippet' : 'Play snippet'}
         >
           {isPlaying ? (
             <Pause size={28} className="icon-play" />
+          ) : !previewUrl ? (
+            <Loader2 size={26} className="icon-play animate-spin" />
           ) : (
             <Play size={28} className="icon-play" style={{ marginLeft: '3px' }} />
           )}
@@ -263,12 +292,21 @@ export default function AudioSnippetPlayer({
       {/* Current snippet info */}
       <div className="snippet-status">
         <div className="duration-badge">
-          <Sparkles size={14} className="sparkle-icon" />
-          <span>
-            {isRoundOver
-              ? 'Full Track Preview (30s)'
-              : `Playing Opening ${maxPlayDuration}s Segment`}
-          </span>
+          {!previewUrl ? (
+            <>
+              <Loader2 size={14} className="sparkle-icon animate-spin" />
+              <span>Loading Audio Snippet...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles size={14} className="sparkle-icon" />
+              <span>
+                {isRoundOver
+                  ? 'Full Track Preview (30s)'
+                  : `Playing Opening ${maxPlayDuration}s Segment`}
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>
