@@ -60,27 +60,22 @@ export default function SettingsModal({
               <Radio size={16} /> Apple Music Connection
             </h3>
             <p className="section-desc">
-              {musicKitReady
-                ? 'Apple Music is ready. Log in with your Apple ID to enjoy full catalog tracks and seamless integration.'
-                : isMusicKitLoading
-                  ? 'Connecting to Apple Music services...'
-                  : 'Apple Music connection is being set up. The game works instantly with built-in preview audio.'}
+              {isAppleMusicAuthorized
+                ? 'Your Apple Music subscription is connected and active.'
+                : 'PopsIQ plays high-fidelity 30-second previews from the Apple Music public catalog. Logging into an Apple Music subscription is completely optional.'}
             </p>
 
             <div className="auth-box">
               <div className="auth-status-indicator">
-                <span className={`status-dot ${isAppleMusicAuthorized ? 'online' :
-                    musicKitReady ? 'ready' :
-                      isMusicKitLoading ? 'loading' : 'preview'
-                  }`}></span>
+                <span
+                  className={`status-dot ${
+                    isAppleMusicAuthorized ? 'online' : 'preview'
+                  }`}
+                ></span>
                 <span className="status-label">
                   {isAppleMusicAuthorized
                     ? 'Apple Music Subscriber: Active'
-                    : musicKitReady
-                      ? 'Ready — Log in to access full catalog'
-                      : isMusicKitLoading
-                        ? 'Connecting to Apple Music...'
-                        : 'Mode: High-Fidelity Apple Preview Streams'}
+                    : 'Audio Mode: Free Apple Music 30s Previews'}
                 </span>
               </div>
 
@@ -94,12 +89,24 @@ export default function SettingsModal({
                   : isAppleMusicAuthorized
                     ? 'Disconnect Apple Music'
                     : musicKitReady
-                      ? 'Log in with Apple Music'
-                      : 'Apple Music Not Available'}
+                      ? 'Sign in with Apple Music (Optional)'
+                      : isMusicKitLoading
+                        ? 'Connecting...'
+                        : 'Apple Music Sign-In Unavailable'}
               </button>
             </div>
 
             {authError && <div className="error-alert">{authError}</div>}
+          </div>
+
+          {/* Public Preview Info Section */}
+          <div className="settings-section">
+            <h3 className="section-title">
+              <Info size={16} /> Public Audio Previews
+            </h3>
+            <p className="section-desc">
+              All UK Top 10 chart snippet rounds are enabled with official 30-second audio previews streamed directly from Apple Music. No account or subscription required to play.
+            </p>
           </div>
 
         </div>

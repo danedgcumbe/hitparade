@@ -150,6 +150,13 @@ export async function fetchAppleMusicTrackMetadata(trackOrQuery) {
           candidates.push(`${artist} ${withoutParens}`);
         }
       }
+      // Handle collaboration splitting (feat. / featuring / ft. / with / &)
+      if (/ feat\.? | featuring | ft\.? | with /i.test(artist)) {
+        const primary = artist.split(/ feat\.? | featuring | ft\.? | with /i)[0].trim();
+        if (primary && primary !== artist) {
+          candidates.push(`${primary} ${title}`.trim());
+        }
+      }
     }
   }
 
@@ -169,6 +176,39 @@ export async function fetchAppleMusicTrackMetadata(trackOrQuery) {
     for (const query of uniqueCandidates) {
       result = await queryItunesApi(query, 'us', 10);
       if (result) break;
+    }
+  }
+
+  // Third pass: if MusicKit JS is active, fallback to MusicKit Catalog API
+  if (!result && typeof window !== 'undefined' && window.MusicKit) {
+    try {
+      const musicKit = window.MusicKit.getInstance();
+      if (musicKit && musicKit.api) {
+        for (const query of uniqueCandidates.slice(0, 2)) {
+          const mkRes = await musicKit.api.music('v1/catalog/gb/search', {
+            term: query,
+            types: 'songs',
+            limit: 3
+          });
+          const song = mkRes?.data?.results?.songs?.data?.[0];
+          const previewUrl = song?.attributes?.previews?.[0]?.url;
+          if (previewUrl) {
+            const rawArtwork = song?.attributes?.artwork?.url;
+            result = {
+              previewUrl,
+              artworkUrl: rawArtwork ? rawArtwork.replace('{w}', '600').replace('{h}', '600') : null,
+              trackViewUrl: song?.attributes?.url,
+              artistName: song?.attributes?.artistName,
+              trackName: song?.attributes?.name,
+              collectionName: song?.attributes?.albumName,
+              appleTrackId: song?.id
+            };
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      // MusicKit API search fallback error ignored
     }
   }
 

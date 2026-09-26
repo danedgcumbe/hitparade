@@ -6,7 +6,6 @@ import ArtistGuessInput from './components/ArtistGuessInput';
 import RoundResultModal from './components/RoundResultModal';
 import SettingsModal from './components/SettingsModal';
 import GameSummaryModal from './components/GameSummaryModal';
-import AppleMusicGate from './components/AppleMusicGate';
 
 import {
   UK_TOP_10_TRACKS,
@@ -426,41 +425,13 @@ export default function App() {
     setIsGameFinished(false);
   };
 
-  // Apple Music Auth Button click
-  const handleAppleAuthClick = async () => {
-    if (isAppleMusicAuthorized) {
-      setIsSettingsOpen(true);
-    } else {
-      try {
-        await loginWithAppleMusic();
-        setIsAppleMusicAuthorized(true);
-      } catch (e) {
-        setIsSettingsOpen(true);
-      }
-    }
-  };
-
-  // Gate login handler
-  const handleGateLogin = async () => {
-    const res = await loginWithAppleMusic();
-    if (res.isAuthorized) {
-      setIsAppleMusicAuthorized(true);
-    }
+  // Apple Music Auth Button click — opens settings to inspect audio mode or connect
+  const handleAppleAuthClick = () => {
+    setIsSettingsOpen(true);
   };
 
   const todayDateString = getTodayDateString();
   const dailyNumber = getDailyNumber(todayDateString);
-
-  // Show login gate if user is not authorized
-  if (!isAppleMusicAuthorized) {
-    return (
-      <AppleMusicGate
-        isMusicKitLoading={isMusicKitLoading}
-        isMusicKitConfigured={isMusicKitConfigured()}
-        onLogin={handleGateLogin}
-      />
-    );
-  }
 
   return (
     <div className="app-root">

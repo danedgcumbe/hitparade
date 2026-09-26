@@ -110,16 +110,16 @@ export default function Header({
 
         {/* Apple Music Login / Subscriber status */}
         <button
-          className={`apple-auth-btn ${isAppleMusicAuthorized ? 'connected' : ''}`}
+          className={`apple-auth-btn ${isAppleMusicAuthorized ? 'connected' : 'preview-mode'}`}
           onClick={onAppleMusicAuthClick}
           title={
             isAppleMusicAuthorized
-              ? 'Apple Music Connected (Full Catalog Streaming)'
-              : 'Log in with Apple Music for full features'
+              ? 'Apple Music Connected (Active)'
+              : 'Playing with Apple Music 30s previews. Sign in is optional.'
           }
         >
           <Radio size={14} className="apple-icon" />
-          <span>{isAppleMusicAuthorized ? 'Apple Music Active' : 'Apple Music'}</span>
+          <span>{isAppleMusicAuthorized ? 'Apple Music Active' : '30s Previews'}</span>
         </button>
 
         {/* Settings button */}
