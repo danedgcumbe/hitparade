@@ -72,9 +72,10 @@ export function getCachedTrackMetadata(trackOrQuery) {
 }
 
 /**
- * Low-level helper to query iTunes Search API and extract a track with audio preview
+ * Low-level helper to query iTunes Search API for artwork & track identity only.
+ * Explicitly does NOT return previewUrl — playback requires Apple Music subscription via MusicKit.
  */
-async function queryItunesApi(searchTerm, country = 'gb', limit = 10) {
+async function queryItunesForMetadata(searchTerm, country = 'gb', limit = 10) {
   try {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
       searchTerm
@@ -91,15 +92,16 @@ async function queryItunesApi(searchTerm, country = 'gb', limit = 10) {
     }
 
     if (data.results && Array.isArray(data.results) && data.results.length > 0) {
-      // Prioritize results that explicitly have a previewUrl
-      const candidate = data.results.find((r) => r.previewUrl) || data.results[0];
-      if (candidate && candidate.previewUrl) {
+      const candidate = data.results[0];
+      if (candidate) {
         return {
-          previewUrl: candidate.previewUrl,
+          // previewUrl intentionally omitted — no free previews allowed
+          previewUrl: null,
           artworkUrl:
             candidate.artworkUrl100?.replace('100x100bb.jpg', '600x600bb.jpg') ||
-            candidate.artworkUrl100,
-          trackViewUrl: candidate.trackViewUrl,
+            candidate.artworkUrl100 ||
+            null,
+          trackViewUrl: candidate.trackViewUrl || null,
           artistName: candidate.artistName,
           trackName: candidate.trackName,
           collectionName: candidate.collectionName,
@@ -108,14 +110,15 @@ async function queryItunesApi(searchTerm, country = 'gb', limit = 10) {
       }
     }
   } catch (err) {
-    console.warn(`iTunes search error for "${searchTerm}" in ${country}:`, err);
+    console.warn(`iTunes metadata search error for "${searchTerm}" in ${country}:`, err);
   }
   return null;
 }
 
 /**
- * Fetch live Apple preview URL & artwork for any track query with memory & localStorage caching
- * Supports string queries or track objects, with intelligent fallback strategies.
+ * Fetch Apple Music track metadata (artwork, IDs) for any track query.
+ * Audio playback is ONLY via MusicKit JS (requires Apple Music subscription).
+ * previewUrl is always null — no free public previews are served.
  */
 export async function fetchAppleMusicTrackMetadata(trackOrQuery) {
   if (!trackOrQuery) return null;
@@ -139,18 +142,15 @@ export async function fetchAppleMusicTrackMetadata(trackOrQuery) {
     if (appleMusicQuery) candidates.push(appleMusicQuery.trim());
     if (artist && title) {
       candidates.push(`${artist} ${title}`.trim());
-      // Handle double A-sides (e.g., "Im Only Sleeping/Off On Holiday")
       if (title.includes('/')) {
         candidates.push(`${artist} ${title.split('/')[0].trim()}`);
       }
-      // Handle parenthetical subtitles
       if (title.includes('(') || title.includes(')')) {
         const withoutParens = title.replace(/\(.*?\)/g, '').trim();
         if (withoutParens) {
           candidates.push(`${artist} ${withoutParens}`);
         }
       }
-      // Handle collaboration splitting (feat. / featuring / ft. / with / &)
       if (/ feat\.? | featuring | ft\.? | with /i.test(artist)) {
         const primary = artist.split(/ feat\.? | featuring | ft\.? | with /i)[0].trim();
         if (primary && primary !== artist) {
@@ -162,25 +162,9 @@ export async function fetchAppleMusicTrackMetadata(trackOrQuery) {
 
   const uniqueCandidates = [...new Set(candidates)].filter(Boolean);
 
-  // 3. Search with candidates across GB store, then fallback to US store
-  let result = null;
-
-  // First pass: try candidates in primary GB store with limit=10
-  for (const query of uniqueCandidates) {
-    result = await queryItunesApi(query, 'gb', 10);
-    if (result) break;
-  }
-
-  // Second pass: if still no preview, try candidates in US store
-  if (!result) {
-    for (const query of uniqueCandidates) {
-      result = await queryItunesApi(query, 'us', 10);
-      if (result) break;
-    }
-  }
-
-  // Third pass: if MusicKit JS is active, fallback to MusicKit Catalog API
-  if (!result && typeof window !== 'undefined' && window.MusicKit) {
+  // 3. Try to resolve MusicKit catalog song ID for subscription playback
+  let musicKitSongId = null;
+  if (typeof window !== 'undefined' && window.MusicKit) {
     try {
       const musicKit = window.MusicKit.getInstance();
       if (musicKit && musicKit.api) {
@@ -191,19 +175,26 @@ export async function fetchAppleMusicTrackMetadata(trackOrQuery) {
             limit: 3
           });
           const song = mkRes?.data?.results?.songs?.data?.[0];
-          const previewUrl = song?.attributes?.previews?.[0]?.url;
-          if (previewUrl) {
+          if (song?.id) {
+            musicKitSongId = song.id;
             const rawArtwork = song?.attributes?.artwork?.url;
-            result = {
-              previewUrl,
-              artworkUrl: rawArtwork ? rawArtwork.replace('{w}', '600').replace('{h}', '600') : null,
-              trackViewUrl: song?.attributes?.url,
+            const result = {
+              previewUrl: null, // No previews — subscription playback only
+              artworkUrl: rawArtwork
+                ? rawArtwork.replace('{w}', '600').replace('{h}', '600')
+                : null,
+              trackViewUrl: song?.attributes?.url || null,
               artistName: song?.attributes?.artistName,
               trackName: song?.attributes?.name,
               collectionName: song?.attributes?.albumName,
-              appleTrackId: song?.id
+              appleTrackId: song?.id,
+              musicKitSongId
             };
-            break;
+            if (cacheKey) {
+              metadataCache.set(cacheKey, result);
+              try { localStorage.setItem(cacheKey, JSON.stringify(result)); } catch (e) {}
+            }
+            return result;
           }
         }
       }
@@ -212,10 +203,22 @@ export async function fetchAppleMusicTrackMetadata(trackOrQuery) {
     }
   }
 
-  // 4. Cache and return if found
+  // 4. Fall back to iTunes metadata-only lookup (artwork / IDs, no audio)
+  let result = null;
+  for (const query of uniqueCandidates) {
+    result = await queryItunesForMetadata(query, 'gb', 10);
+    if (result) break;
+  }
+  if (!result) {
+    for (const query of uniqueCandidates) {
+      result = await queryItunesForMetadata(query, 'us', 10);
+      if (result) break;
+    }
+  }
+
+  // 5. Cache and return if found
   if (result && cacheKey) {
     metadataCache.set(cacheKey, result);
-    // Also cache by string query if track object was provided
     if (typeof trackOrQuery !== 'string') {
       const stringKey = getCacheKey(
         trackOrQuery.appleMusicQuery || `${trackOrQuery.artist} ${trackOrQuery.title}`
@@ -224,12 +227,9 @@ export async function fetchAppleMusicTrackMetadata(trackOrQuery) {
         metadataCache.set(stringKey, result);
       }
     }
-
     try {
       localStorage.setItem(cacheKey, JSON.stringify(result));
-    } catch (e) {
-      // localStorage quota exceeded
-    }
+    } catch (e) {}
     return result;
   }
 

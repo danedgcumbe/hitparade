@@ -6,6 +6,7 @@ import ArtistGuessInput from './components/ArtistGuessInput';
 import RoundResultModal from './components/RoundResultModal';
 import SettingsModal from './components/SettingsModal';
 import GameSummaryModal from './components/GameSummaryModal';
+import AppleMusicGate from './components/AppleMusicGate';
 
 import {
   UK_TOP_10_TRACKS,
@@ -191,9 +192,8 @@ export default function App() {
 
   const currentTrack = trackQueue[roundIndex] || UK_TOP_10_TRACKS[0];
 
-  // Active artwork & preview URL (with Apple Music dynamic metadata fallback)
-  const activePreviewUrl =
-    liveTrackInfo?.previewUrl || currentTrack.fallbackPreview;
+  // Active artwork & preview URL — only use Apple Music streams (no fallback previews)
+  const musicKitSongId = liveTrackInfo?.musicKitSongId || liveTrackInfo?.appleTrackId || null;
   const activeArtworkUrl =
     liveTrackInfo?.artworkUrl || currentTrack.artworkUrl;
 
@@ -425,13 +425,35 @@ export default function App() {
     setIsGameFinished(false);
   };
 
-  // Apple Music Auth Button click — opens settings to inspect audio mode or connect
+  // Apple Music Auth Button click — opens settings
   const handleAppleAuthClick = () => {
     setIsSettingsOpen(true);
   };
 
+  // Login handler used by AppleMusicGate
+  const handleGateLogin = async () => {
+    const res = await loginWithAppleMusic();
+    if (res?.isAuthorized) {
+      setIsAppleMusicAuthorized(true);
+    }
+  };
+
   const todayDateString = getTodayDateString();
   const dailyNumber = getDailyNumber(todayDateString);
+
+  // Show login gate whenever the user is not authorized
+  if (!isMusicKitLoading && !isAppleMusicAuthorized) {
+    return (
+      <div className="app-root">
+        <AppleMusicGate
+          isMusicKitLoading={isMusicKitLoading}
+          isMusicKitConfigured={isMusicKitConfigured()}
+          onLogin={handleGateLogin}
+        />
+        <Analytics />
+      </div>
+    );
+  }
 
   return (
     <div className="app-root">
@@ -489,7 +511,7 @@ export default function App() {
 
             {/* Audio Snippet Player */}
             <AudioSnippetPlayer
-              previewUrl={activePreviewUrl}
+              musicKitSongId={musicKitSongId}
               currentAttempt={currentAttempt}
               maxAttempts={MAX_ATTEMPTS}
               isRoundOver={isRoundOver}

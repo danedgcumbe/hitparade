@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Radio, Info } from 'lucide-react';
+import { X, Radio } from 'lucide-react';
 import {
   loginWithAppleMusic,
   logoutAppleMusic,
@@ -62,7 +62,7 @@ export default function SettingsModal({
             <p className="section-desc">
               {isAppleMusicAuthorized
                 ? 'Your Apple Music subscription is connected and active.'
-                : 'PopsIQ plays high-fidelity 30-second previews from the Apple Music public catalog. Logging into an Apple Music subscription is completely optional.'}
+                : 'An Apple Music subscription is required to play PopsIQ. Sign in to stream full-quality audio snippets.'}
             </p>
 
             <div className="auth-box">
@@ -89,7 +89,7 @@ export default function SettingsModal({
                   : isAppleMusicAuthorized
                     ? 'Disconnect Apple Music'
                     : musicKitReady
-                      ? 'Sign in with Apple Music (Optional)'
+                      ? 'Sign in with Apple Music'
                       : isMusicKitLoading
                         ? 'Connecting...'
                         : 'Apple Music Sign-In Unavailable'}
@@ -99,15 +99,6 @@ export default function SettingsModal({
             {authError && <div className="error-alert">{authError}</div>}
           </div>
 
-          {/* Public Preview Info Section */}
-          <div className="settings-section">
-            <h3 className="section-title">
-              <Info size={16} /> Public Audio Previews
-            </h3>
-            <p className="section-desc">
-              All UK Top 10 chart snippet rounds are enabled with official 30-second audio previews streamed directly from Apple Music. No account or subscription required to play.
-            </p>
-          </div>
 
         </div>
 

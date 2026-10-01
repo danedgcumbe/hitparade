@@ -1,11 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, Loader2 } from 'lucide-react';
 import { playClickSound } from '../services/soundEffects';
 
 export const SNIPPET_DURATIONS = [1.5, 3.0, 6.0, 10.0, 15.0];
 
+/**
+ * Get the singleton MusicKit instance (safe — returns null if not ready).
+ */
+function getMK() {
+  try {
+    return window.MusicKit?.getInstance() || null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AudioSnippetPlayer({
-  previewUrl,
+  musicKitSongId,
   currentAttempt,
   maxAttempts,
   isRoundOver,
@@ -17,118 +28,123 @@ export default function AudioSnippetPlayer({
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const audioRef = useRef(null);
   const canvasRef = useRef(null);
   const animationFrameRef = useRef(null);
+  const tickRef = useRef(null);         // setInterval handle for time tracking
+  const startEpochRef = useRef(null);   // wall-clock time when snippet started
+  const startOffsetRef = useRef(0);     // MusicKit playbackTime at snippet start
+
   const maxPlayDuration = isRoundOver ? 30 : (SNIPPET_DURATIONS[currentAttempt] || 15);
 
-  // Stop playback and reload media engine when previewUrl changes
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      if (previewUrl) {
-        audioRef.current.load();
-      }
+  // ─── Helper: stop everything ────────────────────────────────────────────────
+  const stopAll = useCallback(() => {
+    clearInterval(tickRef.current);
+    tickRef.current = null;
+    const mk = getMK();
+    if (mk && mk.playbackState !== 0 /* NONE */ && mk.playbackState !== 2 /* PAUSED */) {
+      mk.pause().catch(() => {});
     }
     setIsPlaying(false);
     setCurrentTime(0);
     setIsLoading(false);
-  }, [previewUrl]);
+  }, []);
 
-  // Auto-play full 30s preview when round ends (answer revealed)
+  // ─── Stop when song changes or game finishes ─────────────────────────────────
   useEffect(() => {
-    if (isRoundOver && audioRef.current && previewUrl) {
-      audioRef.current.currentTime = 0;
-      setCurrentTime(0);
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => setIsPlaying(true))
-          .catch(() => setIsPlaying(false));
+    stopAll();
+  }, [musicKitSongId, stopAll]);
+
+  useEffect(() => {
+    if (isGameFinished) stopAll();
+  }, [isGameFinished, stopAll]);
+
+  // ─── Auto-play when round ends (reveal the full 30 s) ───────────────────────
+  useEffect(() => {
+    if (isRoundOver && musicKitSongId) {
+      startSnippet();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRoundOver, musicKitSongId]);
+
+  // ─── Tick: track elapsed time & enforce snippet duration cap ─────────────────
+  const startTick = useCallback(() => {
+    clearInterval(tickRef.current);
+    startEpochRef.current = Date.now();
+    tickRef.current = setInterval(() => {
+      const mk = getMK();
+      const elapsed = mk ? (mk.currentPlaybackTime - startOffsetRef.current) : 0;
+      setCurrentTime(elapsed);
+
+      if (elapsed >= maxPlayDuration) {
+        clearInterval(tickRef.current);
+        getMK()?.pause().catch(() => {});
+        setIsPlaying(false);
+        setCurrentTime(0);
+        if (onSnippetEnd) onSnippetEnd();
       }
-    }
-  }, [isRoundOver, previewUrl]);
+    }, 100);
+  }, [maxPlayDuration, onSnippetEnd]);
 
-  // Stop playback when game finishes (summary modal appears)
-  useEffect(() => {
-    if (isGameFinished && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+  // ─── Core play logic ─────────────────────────────────────────────────────────
+  const startSnippet = useCallback(async () => {
+    const mk = getMK();
+    if (!mk || !musicKitSongId) return;
+
+    setIsLoading(true);
+    try {
+      // Queue the song by Apple Music catalog ID
+      await mk.setQueue({ song: musicKitSongId });
+      // Seek to beginning
+      await mk.seekToTime(0);
+      startOffsetRef.current = 0;
+      await mk.play();
+      setIsLoading(false);
+      setIsPlaying(true);
+      startTick();
+    } catch (err) {
+      console.warn('MusicKit playback error:', err);
+      setIsLoading(false);
       setIsPlaying(false);
-      setCurrentTime(0);
     }
-  }, [isGameFinished]);
+  }, [musicKitSongId, startTick]);
 
-  // Handle audio progress and hard-stop at maxPlayDuration
-  const handleTimeUpdate = () => {
-    if (!audioRef.current) return;
-    const time = audioRef.current.currentTime;
-    setCurrentTime(time);
-
-    if (time >= maxPlayDuration) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      setCurrentTime(0);
-      if (onSnippetEnd) onSnippetEnd();
-    }
-  };
-
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     playClickSound();
-    if (!audioRef.current || !previewUrl) return;
+    const mk = getMK();
+    if (!mk || !musicKitSongId) return;
 
     if (isPlaying) {
-      audioRef.current.pause();
+      mk.pause().catch(() => {});
+      clearInterval(tickRef.current);
       setIsPlaying(false);
     } else {
-      audioRef.current.currentTime = 0;
-      setCurrentTime(0);
-      setIsLoading(true);
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setIsLoading(false);
-            setIsPlaying(true);
-          })
-          .catch((err) => {
-            console.warn('Playback interrupted or blocked:', err);
-            setIsLoading(false);
-            setIsPlaying(false);
-          });
-      }
+      startSnippet();
     }
-  };
+  }, [isPlaying, musicKitSongId, startSnippet]);
 
-  const restartPlay = () => {
+  const restartPlay = useCallback(() => {
     playClickSound();
-    if (!audioRef.current || !previewUrl) return;
-    audioRef.current.currentTime = 0;
-    setCurrentTime(0);
-    setIsLoading(true);
-    const playPromise = audioRef.current.play();
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          setIsLoading(false);
-          setIsPlaying(true);
-        })
-        .catch((err) => {
-          console.warn('Restart play error:', err);
-          setIsLoading(false);
-        });
-    }
-  };
+    stopAll();
+    setTimeout(() => startSnippet(), 80);
+  }, [stopAll, startSnippet]);
 
   const toggleMute = () => {
-    if (!audioRef.current) return;
-    audioRef.current.muted = !isMuted;
-    setIsMuted(!isMuted);
+    const mk = getMK();
+    if (!mk) return;
+    const newMuted = !isMuted;
+    mk.volume = newMuted ? 0 : 1;
+    setIsMuted(newMuted);
   };
 
-  // Canvas Waveform Animation
+  // ─── Cleanup on unmount ──────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      clearInterval(tickRef.current);
+      getMK()?.pause().catch(() => {});
+    };
+  }, []);
+
+  // ─── Canvas Waveform Animation ───────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -148,12 +164,10 @@ export default function AudioSnippetPlayer({
         let barHeight = 4;
 
         if (isPlaying) {
-          // Dynamic lively wave
           const freq1 = Math.sin(phase + i * 0.28) * 0.5 + 0.5;
           const freq2 = Math.cos(phase * 1.4 + i * 0.45) * 0.5 + 0.5;
           barHeight = 6 + (freq1 * 0.6 + freq2 * 0.4) * (height - 12);
         } else {
-          // Idle subtle pulse
           barHeight = 4 + Math.sin(phase * 0.4 + i * 0.15) * 2;
         }
 
@@ -184,38 +198,16 @@ export default function AudioSnippetPlayer({
     };
 
     render();
-
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, [isPlaying, currentTime, maxPlayDuration]);
 
   const progressPercent = Math.min(100, (currentTime / maxPlayDuration) * 100);
+  const isReady = !!musicKitSongId;
 
   return (
     <div className="player-container">
-      <audio
-        ref={audioRef}
-        src={previewUrl}
-        preload="auto"
-        onTimeUpdate={handleTimeUpdate}
-        onWaiting={() => setIsLoading(true)}
-        onCanPlay={() => setIsLoading(false)}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onError={(e) => {
-          console.warn('Audio playback error:', e);
-          setIsLoading(false);
-          setIsPlaying(false);
-        }}
-        onEnded={() => {
-          setIsPlaying(false);
-          setCurrentTime(0);
-        }}
-      />
-
       {/* Waveform Visualizer Canvas */}
       <div className="visualizer-wrapper">
         <canvas
@@ -233,7 +225,6 @@ export default function AudioSnippetPlayer({
             className="timeline-progress"
             style={{ width: `${progressPercent}%` }}
           />
-          {/* Segment Markers */}
           {SNIPPET_DURATIONS.map((dur, index) => {
             const isUnlocked = index <= currentAttempt || isRoundOver;
             const leftPos = (dur / 15) * 100;
@@ -257,21 +248,21 @@ export default function AudioSnippetPlayer({
           onClick={restartPlay}
           title="Replay from start"
           aria-label="Replay snippet"
-          disabled={!previewUrl}
+          disabled={!isReady}
         >
           <RotateCcw size={18} />
         </button>
 
         <button
-          className={`play-main-button ${isPlaying ? 'playing' : ''} ${isLoading || !previewUrl ? 'loading' : ''}`}
+          className={`play-main-button ${isPlaying ? 'playing' : ''} ${isLoading || !isReady ? 'loading' : ''}`}
           onClick={togglePlay}
-          aria-label={!previewUrl ? 'Loading snippet' : isPlaying ? 'Pause' : 'Play Snippet'}
-          disabled={!previewUrl}
-          title={!previewUrl ? 'Loading audio snippet...' : isPlaying ? 'Pause snippet' : 'Play snippet'}
+          aria-label={!isReady ? 'Loading track' : isPlaying ? 'Pause' : 'Play Snippet'}
+          disabled={!isReady}
+          title={!isReady ? 'Loading track...' : isPlaying ? 'Pause snippet' : 'Play snippet'}
         >
           {isPlaying ? (
             <Pause size={28} className="icon-play" />
-          ) : !previewUrl ? (
+          ) : !isReady ? (
             <Loader2 size={26} className="icon-play animate-spin" />
           ) : (
             <Play size={28} className="icon-play" style={{ marginLeft: '3px' }} />
@@ -292,17 +283,17 @@ export default function AudioSnippetPlayer({
       {/* Current snippet info */}
       <div className="snippet-status">
         <div className="duration-badge">
-          {!previewUrl ? (
+          {!isReady ? (
             <>
               <Loader2 size={14} className="sparkle-icon animate-spin" />
-              <span>Loading Audio Snippet...</span>
+              <span>Loading Track...</span>
             </>
           ) : (
             <>
               <Sparkles size={14} className="sparkle-icon" />
               <span>
                 {isRoundOver
-                  ? 'Full Track Preview (30s)'
+                  ? 'Full Track (Apple Music)'
                   : `Playing Opening ${maxPlayDuration}s Segment`}
               </span>
             </>

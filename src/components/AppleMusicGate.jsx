@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Music2, Radio, Loader, AlertCircle, Sparkles } from 'lucide-react';
+import { Music2, Radio, Loader, AlertCircle } from 'lucide-react';
 
 export default function AppleMusicGate({
   isMusicKitLoading,
   isMusicKitConfigured,
-  onLogin,
-  onContinuePreviews
+  onLogin
 }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState('');
@@ -42,34 +41,29 @@ export default function AppleMusicGate({
         {/* Description */}
         <p className="gate-desc">
           Listen to opening snippets of iconic UK chart hits and guess the artist.
-          Play instantly with Apple Music 30-second previews, or sign in with your Apple Music subscription.
+          An active Apple Music subscription is required to play.
         </p>
 
         {/* Actions */}
         <div className="gate-action">
-          {onContinuePreviews && (
-            <button
-              className="gate-preview-btn"
-              onClick={onContinuePreviews}
-            >
-              <Sparkles size={18} className="gate-btn-icon" />
-              <span>Play with Free 30s Previews</span>
-            </button>
-          )}
-
           {isMusicKitLoading ? (
             <div className="gate-loading">
               <Loader size={20} className="gate-spinner" />
               <span>Connecting to Apple Music...</span>
             </div>
-          ) : !isMusicKitConfigured ? null : (
+          ) : !isMusicKitConfigured ? (
+            <div className="gate-loading">
+              <AlertCircle size={20} />
+              <span>Apple Music is unavailable. Please try again later.</span>
+            </div>
+          ) : (
             <button
-              className="gate-login-btn secondary"
+              className="gate-login-btn"
               onClick={handleLogin}
               disabled={isLoggingIn}
             >
               <Radio size={18} className="gate-btn-icon" />
-              <span>{isLoggingIn ? 'Connecting...' : 'Sign in with Apple Music (Optional)'}</span>
+              <span>{isLoggingIn ? 'Connecting...' : 'Sign in with Apple Music'}</span>
               {isLoggingIn && <Loader size={16} className="gate-spinner" />}
             </button>
           )}
@@ -84,9 +78,9 @@ export default function AppleMusicGate({
 
         {/* Footer Note */}
         <p className="gate-footer">
-          Official 30-second audio previews are powered by Apple Music.
+          An Apple Music subscription is required to stream full-quality audio.
           <br />
-          Signing in with Apple Music is optional for subscribers.
+          Your subscription lets you hear every track in full fidelity.
         </p>
       </div>
     </div>
